@@ -1,8 +1,6 @@
 /*jshint jasmine: true */
 beforeEach(function () {
-    Object.keys(require.modules).forEach(function(key) {
-        delete require.modules[key];
-    });
+    require.reset();
 });
 
 describe('resolving', function() {
@@ -84,8 +82,8 @@ describe('errors', function() {
         }).toThrow(new Error('Unexpected define!'))
     });
 
-    xit('should throw error on circular dependence', function(done) {
-        define('A', ['B'], function(B) {
+    iit('should throw error on circular dependence', function(done) {
+        define('A', ['B'], function() {
             return 'A';
         });
 
@@ -94,21 +92,26 @@ describe('errors', function() {
         });
 
         define('C', ['A'], function() {
-            return 'A';
+            return 'C';
         });
 
-        require(['A'], function() { done(); });
+        require(['A'], function() {}).then(function() {
+            expect(true).toBe(false, "unexpected success");
+            done();
+        }, function() {
+            done();
+        });
     });
 
-    xit('should allow to throw custom error', function(done) {
-        var error = Error();
-
-        modules.define('A', function(provide) {
-            provide(null, error);
+    it('should allow to throw custom error', function(done) {
+        define('A', function() {
+            return Promise.reject(new Error())
         });
 
-        modules.require(['A'], function() {}, function(e) {
-            e.should.have.been.equal(error);
+        require(['A'], function() {
+            expect(true).toBe(false, "unexpected success");
+            done();
+        }).catch(function(e) {
             done();
         });
     });
@@ -116,15 +119,15 @@ describe('errors', function() {
 
 describe("script loader", function() {
     function createFakeLoader(depMap) {
-       spyOn(require.config, 'loader').and.callFake(function(dep) {
-           console.log('requesting '+dep);
-           return new Promise(function(resolve) {
+        spyOn(require.config, 'loader').and.callFake(function(dep) {
+            console.info('requesting: '+dep);
+            return new Promise(function(resolve) {
                setTimeout(function() {
                    define.apply(this, depMap[dep]);
                    resolve();
                }, 10);
-           });
-       })
+            });
+        })
     }
 
     it("should load modules", function (done) {

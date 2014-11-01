@@ -1,5 +1,6 @@
 /*global Promise */
 (function(global) {
+    "use strict";
     function flatDeferred() {
         var resolveDep,
             rejectDep,
@@ -14,38 +15,38 @@
         }
     }
     function loadDep(dep) {
-        function callback() {
-            if(loadQueue.length > 0) {
-                var deferred = loadQueue.shift();
-                requirePath.push(deferred);
-                require.config.loader(deferred.name).then(function () {
-                    callback()
-                }, deferred.reject);
-            }
-        }
         var deferred = flatDeferred();
         deferred.name = dep;
-        loadQueue.push(deferred);
-        if(loadQueue.length === 1) {
-            callback();
+        if(currentRequire) {
+            throw new Error('Module '+currentRequire.name+' already loading')
         }
+        currentRequire = deferred;
+        require.config.loader(deferred.name).catch(deferred.reject);
         return deferred.promise;
     }
     function require(deps, factory) {
-        function invokeNext(func) {
-            return loadChain = loadChain.then(func);
+        function invokeNext(dep, func) {
+            return loadChain = loadChain.then(function() {
+                dependencyPath.push(dep);
+            }).then(func).then(function(result) {
+                dependencyPath.pop();
+                return result
+            });
         }
         var loadChain = Promise.resolve();
         return Promise.all(deps.map(function(dep) {
             var promise;
+            if(dependencyPath.indexOf(dep) > -1) {
+                throw new Error('Circular dependency: '+dependencyPath.concat(dep).join(' -> '))
+            }
             if(predefines[dep]) {
                 var definition = predefines[dep];
                 delete predefines[dep];
-                promise = invokeNext(function() {
+                promise = invokeNext(dep, function() {
                     return require.apply(null, definition);
                 });
             } else if(!modules[dep]) {
-                promise = invokeNext(function () {
+                promise = invokeNext(dep, function () {
                     return loadDep(dep)
                 });
             }
@@ -54,9 +55,9 @@
             return factory.apply(null, deps)
         }, function(reason) {
             if(reason instanceof Error) {
-                reason = reason.stack;
+                console.error(reason.stack);
             }
-            console.error(reason);
+            return Promise.reject(reason);
         });
     }
     require.config = {
@@ -72,10 +73,13 @@
             });
         }
     };
-    var loadQueue = [],
-        requirePath = [],
-        predefines = {},
-        modules = require.modules = {};
+    require.reset = function() {
+        predefines = {};
+        dependencyPath = [];
+        modules = require.modules = {}
+    };
+    var currentRequire, dependencyPath, predefines, modules = require.modules;
+    require.reset();
 
     global.require = require;
     global.define = function define(name, deps, factory) {
@@ -88,15 +92,12 @@
             factory = deps;
             deps = [];
         }
-        if(name === null && requirePath.length === 0) {
+        if(name === null && !currentRequire) {
             throw new Error('Unexpected define!');
         }
-        var lastReq = requirePath.slice(-1)[0];
-        if (lastReq && (lastReq.name == name || !name)) {
-            lastReq.resolve(require(deps, factory).then(function (dep) {
-                requirePath.pop();
-                return dep;
-            }));
+        if (currentRequire && (currentRequire.name == name || !name)) {
+            currentRequire.resolve(require(deps, factory));
+            currentRequire = null;
         } else {
             predefines[name] = [deps, factory];
         }
