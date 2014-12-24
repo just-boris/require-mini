@@ -2,24 +2,19 @@
 (function(global) {
     "use strict";
     function flatDeferred() {
-        var resolveDep,
-            rejectDep,
-            promise = new Promise(function(resolve, reject) {
-            resolveDep = resolve;
-            rejectDep = reject;
+        var result = {};
+        result.promise = new Promise(function(resolve, reject) {
+            result.resolve = resolve;
+            result.reject = reject;
         });
-        return {
-            promise: promise,
-            resolve: resolveDep,
-            reject: rejectDep
-        }
+        return result;
     }
     function loadDep(dep) {
-        var deferred = flatDeferred();
-        deferred.name = dep;
         if(currentRequire) {
             throw new Error('Module '+currentRequire.name+' already loading')
         }
+        var deferred = flatDeferred();
+        deferred.name = dep;
         currentRequire = deferred;
         require.config.loader(deferred.name).catch(deferred.reject);
         return deferred.promise;
@@ -50,7 +45,7 @@
                     return loadDep(dep)
                 });
             }
-            return promise ? (modules[dep] = promise) : modules[dep];
+            return modules[dep] || (modules[dep] = promise);
         })).then(function(deps) {
             return factory.apply(null, deps)
         }, function(reason) {
