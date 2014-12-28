@@ -1,4 +1,28 @@
 /*global Promise */
+if (!Object.assign) {
+    Object.defineProperty(Object, "assign", {
+        enumerable: false,
+        configurable: true,
+        writable: true,
+        value: function(target, firstSource) {
+            "use strict";
+            if (target === undefined || target === null)
+                throw new TypeError("Cannot convert first argument to object");
+            var to = Object(target);
+            for (var i = 1; i < arguments.length; i++) {
+                var nextSource = arguments[i];
+                if (nextSource === undefined || nextSource === null) continue;
+                var keysArray = Object.keys(Object(nextSource));
+                for (var nextIndex = 0, len = keysArray.length; nextIndex < len; nextIndex++) {
+                    var nextKey = keysArray[nextIndex];
+                    var desc = Object.getOwnPropertyDescriptor(nextSource, nextKey);
+                    if (desc !== undefined && desc.enumerable) to[nextKey] = nextSource[nextKey];
+                }
+            }
+            return to;
+        }
+    });
+}
 (function(global) {
     "use strict";
     function flatDeferred() {
@@ -16,25 +40,28 @@
         var deferred = flatDeferred();
         deferred.name = dep;
         currentRequire = deferred;
-        require.config.loader(deferred.name).catch(deferred.reject);
+        config.loader(deferred.name).catch(deferred.reject);
         return deferred.promise;
     }
+    function invokeNext(dep, func) {
+        return loadChain = loadChain.then(function() {
+            dependencyPath.push(dep);
+        }).then(func).then(function(result) {
+            dependencyPath.pop();
+            return result;
+        });
+    }
     function require(deps, factory) {
-        function invokeNext(dep, func) {
-            return loadChain = loadChain.then(function() {
-                dependencyPath.push(dep);
-            }).then(func).then(function(result) {
-                dependencyPath.pop();
-                return result
-            });
-        }
-        var loadChain = Promise.resolve();
+        loadChain = Promise.resolve();
         return Promise.all(deps.map(function(dep) {
             var promise;
             if(dependencyPath.indexOf(dep) > -1) {
                 throw new Error('Circular dependency: '+dependencyPath.concat(dep).join(' -> '))
             }
-            if(predefines[dep]) {
+            if(locals[dep]) {
+                return locals[dep](currentRequire);
+            }
+            else if(predefines[dep]) {
                 var definition = predefines[dep];
                 delete predefines[dep];
                 promise = invokeNext(dep, function() {
@@ -55,28 +82,88 @@
             return Promise.reject(reason);
         });
     }
-    require.config = {
-        baseUrl: '',
-        loader: function loadScript(name) {
-            return new Promise(function(resolve, reject) {
-                var el = document.createElement("script");
-                el.onload = resolve;
-                el.onerror = reject;
-                el.async = true;
-                el.src = require.config.baseUrl + name + '.js';
-                document.getElementsByTagName('body')[0].appendChild(el);
-            });
-        }
+    require.config = function(newConfig) {
+        config = Object.assign(Object.create(config), newConfig);
+    };
+    require.toUrl = function(name) {
+        var hasExt = name.split('.').length > 1;
+        return (config.paths[name] || config.baseUrl + name) + (hasExt ? '' : '.js');
+    };
+    require.defined = function(name) {
+        return !!modules[name];
     };
     require.reset = function() {
         predefines = {};
         dependencyPath = [];
-        modules = require.modules = {}
+        config = defaultConfig;
+        modules = require.modules = {};
+        loadChain = Promise.resolve();
     };
-    var currentRequire, dependencyPath, predefines, modules = require.modules;
+    var currentRequire, dependencyPath, predefines, config, loadChain, modules = require.modules,
+        locals = {
+            module: function moduleFactory(currentRequire) {
+                currentRequire = currentRequire || {};
+                return {
+                    id: currentRequire.name,
+                    uri: currentRequire.url,
+                    config: function() {
+                        return config.config[currentRequire.name] || {};
+                    }
+                }
+            }
+        },
+        defaultConfig = {
+            baseUrl: '',
+            paths: {},
+            shim: {},
+            config: {},
+            loader: function loadScript(name) {
+                if(name.indexOf('!') > -1) {
+                    var parts = name.split('!'),
+                        plugin = parts.shift();
+                    name = parts.join('!');
+                    var suspendedRequire = currentRequire;
+                    currentRequire = null;
+                    return require([plugin], function(plugin) {
+                        return new Promise(function (resolve, reject) {
+                            currentRequire = suspendedRequire;
+                            var callback = function(value) {
+                                resolve(value);
+                                currentRequire.resolve(value);
+                                currentRequire = null;
+                            };
+                            callback.error = function(e) {
+                                reject(e);
+                                currentRequire.reject(e);
+                                currentRequire = null;
+                            };
+                            callback.fromText = function(scriptText) {
+                                (new Function(scriptText))();
+                            };
+                            plugin.load(name, require, callback, {isBuild: false})
+                        })
+                    });
+                }
+                return new Promise(function(resolve, reject) {
+                    var el = document.createElement("script");
+                    el.onload = function() {
+                        if(config.shim[name]) {
+                            currentRequire.resolve(global[config.shim[name].exports]);
+                            currentRequire = null;
+                            delete global[config.shim[name]];
+                        }
+                        resolve();
+                    };
+                    el.onerror = reject;
+                    el.async = true;
+                    el.src = currentRequire.url = require.toUrl(name);
+                    document.getElementsByTagName('body')[0].appendChild(el);
+                });
+            }
+        };
     require.reset();
 
-    global.require = require;
+    global.requirejs = global.require = require;
     global.define = function define(name, deps, factory) {
         if(typeof name !== 'string') {
             factory = deps;
@@ -91,8 +178,9 @@
             throw new Error('Unexpected define!');
         }
         if (currentRequire && (currentRequire.name == name || !name)) {
-            currentRequire.resolve(require(deps, factory));
+            var promise = currentRequire;
             currentRequire = null;
+            promise.resolve(require(deps, factory));
         } else {
             predefines[name] = [deps, factory];
         }
