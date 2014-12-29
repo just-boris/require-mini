@@ -82,7 +82,7 @@ describe('errors', function() {
         }).toThrow(new Error('Unexpected define!'))
     });
 
-    iit('should throw error on circular dependence', function(done) {
+    it('should throw error on circular dependence', function(done) {
         define('A', ['B'], function() {
             return 'A';
         });
@@ -119,15 +119,17 @@ describe('errors', function() {
 
 describe("script loader", function() {
     function createFakeLoader(depMap) {
-        spyOn(require.config, 'loader').and.callFake(function(dep) {
-            console.info('requesting: '+dep);
-            return new Promise(function(resolve) {
-               setTimeout(function() {
-                   define.apply(this, depMap[dep]);
-                   resolve();
-               }, 10);
-            });
-        })
+        require.config({
+            loader: function(dep) {
+                console.info('requesting: '+dep);
+                return new Promise(function(resolve) {
+                    setTimeout(function() {
+                        define.apply(this, depMap[dep]);
+                        resolve();
+                    }, 10);
+                });
+            }
+        });
     }
 
     it("should load modules", function (done) {

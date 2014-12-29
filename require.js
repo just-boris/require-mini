@@ -34,25 +34,28 @@ if (!Object.assign) {
         return result;
     }
     function loadDep(dep) {
-        if(currentRequire) {
-            throw new Error('Module '+currentRequire.name+' already loading')
-        }
         var deferred = flatDeferred();
         deferred.name = dep;
-        currentRequire = deferred;
-        config.loader(deferred.name).catch(deferred.reject);
+        scriptQueue = scriptQueue.then(function() {
+            if(currentRequire) {
+                throw new Error('Module '+currentRequire.name+' already loading')
+            }
+            currentRequire = deferred;
+            return config.loader(deferred.name).catch(deferred.reject);
+        });
         return deferred.promise;
     }
-    function invokeNext(dep, func) {
-        return loadChain = loadChain.then(function() {
-            dependencyPath.push(dep);
-        }).then(func).then(function(result) {
-            dependencyPath.pop();
-            return result;
-        });
-    }
+
     function require(deps, factory) {
-        loadChain = Promise.resolve();
+        function invokeNext(dep, func) {
+            return dependencyQueue = dependencyQueue.then(function() {
+                dependencyPath.push(dep);
+            }).then(func).then(function(result) {
+                dependencyPath.pop();
+                return result;
+            });
+        }
+        var dependencyQueue = Promise.resolve();
         return Promise.all(deps.map(function(dep) {
             var promise;
             if(dependencyPath.indexOf(dep) > -1) {
@@ -68,8 +71,8 @@ if (!Object.assign) {
                     return require.apply(null, definition);
                 });
             } else if(!modules[dep]) {
-                promise = invokeNext(dep, function () {
-                    return loadDep(dep)
+                promise = invokeNext(dep, function() {
+                    return loadDep(dep);
                 });
             }
             return modules[dep] || (modules[dep] = promise);
@@ -97,9 +100,9 @@ if (!Object.assign) {
         dependencyPath = [];
         config = defaultConfig;
         modules = require.modules = {};
-        loadChain = Promise.resolve();
+        scriptQueue = Promise.resolve();
     };
-    var currentRequire, dependencyPath, predefines, config, loadChain, modules = require.modules,
+    var currentRequire, dependencyPath, predefines, config, scriptQueue, modules = require.modules,
         locals = {
             module: function moduleFactory(currentRequire) {
                 currentRequire = currentRequire || {};
