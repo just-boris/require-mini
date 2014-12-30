@@ -33,50 +33,64 @@ if (!Object.assign) {
         });
         return result;
     }
-    function loadDep(dep) {
+    function asyncMap(deps, fn) {
+        return new Promise(function(resolve, reject) {
+            var i = -1,
+                results = [];
+            function call() {
+                i++;
+                if(i == deps.length)
+                    resolve(results);
+                else {
+                    fn(deps[i]).then(function(result) {
+                        results.push(result);
+                        call();
+                    }, reject)
+                }
+            }
+            call();
+        });
+    }
+    function loadDep(dep, path) {
         var deferred = flatDeferred();
         deferred.name = dep;
-        scriptQueue = scriptQueue.then(function() {
+        deferred.path = path;
+        config.loader(deferred).catch(deferred.reject);
+        return deferred.promise;
+    }
+    function invokeScript(context, func) {
+        return scriptQueue = scriptQueue.then(function() {
             if(currentRequire) {
                 throw new Error('Module '+currentRequire.name+' already loading')
             }
-            currentRequire = deferred;
-            return config.loader(deferred.name).catch(deferred.reject);
+            currentRequire = context;
+            return func();
+        }).then(function() {
+            currentRequire = null;
         });
-        return deferred.promise;
     }
 
-    function require(deps, factory) {
-        function invokeNext(dep, func) {
-            return dependencyQueue = dependencyQueue.then(function() {
-                dependencyPath.push(dep);
-            }).then(func).then(function(result) {
-                dependencyPath.pop();
-                return result;
-            });
-        }
-        var dependencyQueue = Promise.resolve();
-        return Promise.all(deps.map(function(dep) {
-            var promise;
-            if(dependencyPath.indexOf(dep) > -1) {
-                throw new Error('Circular dependency: '+dependencyPath.concat(dep).join(' -> '))
-            }
+    function require(deps, factory, path/*only internal*/) {
+        path = path || [];
+        return asyncMap(deps, function(dep) {
             if(locals[dep]) {
-                return locals[dep](currentRequire);
+                return Promise.resolve(locals[dep](currentRequire));
             }
-            else if(predefines[dep]) {
-                var definition = predefines[dep];
-                delete predefines[dep];
-                promise = invokeNext(dep, function() {
-                    return require.apply(null, definition);
-                });
-            } else if(!modules[dep]) {
-                promise = invokeNext(dep, function() {
-                    return loadDep(dep);
-                });
+            else {
+                if(path.indexOf(dep) > -1) {
+                    throw new Error('Circular dependency: '+path.concat(dep).join(' -> '))
+                }
+                var newPath = path.concat(dep);
+                if(predefines[dep]) {
+                    var definition = predefines[dep].concat([newPath]);
+                    delete predefines[dep];
+                    modules[dep] = require.apply(null, definition);
+                } else if(!modules[dep]) {
+                    modules[dep] = loadDep(dep, newPath);
+                }
+                return modules[dep];
             }
-            return modules[dep] || (modules[dep] = promise);
-        })).then(function(deps) {
+        }).then(function(deps) {
             return factory.apply(null, deps)
         }, function(reason) {
             if(reason instanceof Error) {
@@ -97,12 +111,11 @@ if (!Object.assign) {
     };
     require.reset = function() {
         predefines = {};
-        dependencyPath = [];
         config = defaultConfig;
         modules = require.modules = {};
         scriptQueue = Promise.resolve();
     };
-    var currentRequire, dependencyPath, predefines, config, scriptQueue, modules = require.modules,
+    var currentRequire, predefines, config, scriptQueue, modules = require.modules,
         locals = {
             module: function moduleFactory(currentRequire) {
                 currentRequire = currentRequire || {};
@@ -120,47 +133,46 @@ if (!Object.assign) {
             paths: {},
             shim: {},
             config: {},
-            loader: function loadScript(name) {
-                if(name.indexOf('!') > -1) {
-                    var parts = name.split('!'),
+            loader: function loadScript(deferred) {
+                if(deferred.name.indexOf('!') > -1) {
+                    var parts = deferred.name.split('!'),
                         plugin = parts.shift();
-                    name = parts.join('!');
-                    var suspendedRequire = currentRequire;
-                    currentRequire = null;
+                    deferred.name = parts.join('!');
                     return require([plugin], function(plugin) {
-                        return new Promise(function (resolve, reject) {
-                            currentRequire = suspendedRequire;
-                            var callback = function(value) {
-                                resolve(value);
-                                currentRequire.resolve(value);
-                                currentRequire = null;
-                            };
-                            callback.error = function(e) {
-                                reject(e);
-                                currentRequire.reject(e);
-                                currentRequire = null;
-                            };
-                            callback.fromText = function(scriptText) {
-                                (new Function(scriptText))();
-                            };
-                            plugin.load(name, require, callback, {isBuild: false})
-                        })
+                        invokeScript(deferred, function() {
+                            return new Promise(function (resolve, reject) {
+                                var callback = function(value) {
+                                    currentRequire.resolve(value);
+                                    resolve(value);
+                                };
+                                callback.error = function(e) {
+                                    currentRequire.reject(e);
+                                    reject(e);
+                                };
+                                callback.fromText = function(scriptText) {
+                                    (new Function(scriptText))();
+                                    resolve();
+                                };
+                                plugin.load(deferred.name, require, callback, {isBuild: false})
+                            })
+                        });
                     });
                 }
-                return new Promise(function(resolve, reject) {
-                    var el = document.createElement("script");
-                    el.onload = function() {
-                        if(config.shim[name]) {
-                            currentRequire.resolve(global[config.shim[name].exports]);
-                            currentRequire = null;
-                            delete global[config.shim[name]];
-                        }
-                        resolve();
-                    };
-                    el.onerror = reject;
-                    el.async = true;
-                    el.src = currentRequire.url = require.toUrl(name);
-                    document.getElementsByTagName('body')[0].appendChild(el);
+                return invokeScript(deferred, function() {
+                    return new Promise(function(resolve, reject) {
+                        var el = document.createElement("script");
+                        el.onload = function() {
+                            if(config.shim[deferred.name]) {
+                                currentRequire.resolve(global[config.shim[deferred.name].exports]);
+                                delete global[config.shim[deferred.name]];
+                            }
+                            resolve();
+                        };
+                        el.onerror = reject;
+                        el.async = true;
+                        el.src = currentRequire.url = require.toUrl(deferred.name);
+                        document.getElementsByTagName('body')[0].appendChild(el);
+                    });
                 });
             }
         };
@@ -181,9 +193,7 @@ if (!Object.assign) {
             throw new Error('Unexpected define!');
         }
         if (currentRequire && (currentRequire.name == name || !name)) {
-            var promise = currentRequire;
-            currentRequire = null;
-            promise.resolve(require(deps, factory));
+            currentRequire.resolve(require(deps, factory, currentRequire.path));
         } else {
             predefines[name] = [deps, factory];
         }
