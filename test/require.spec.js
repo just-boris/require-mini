@@ -117,7 +117,7 @@ describe('errors', function() {
     });
 });
 
-describe("script loader", function() {
+xdescribe("script loader", function() {
     function createFakeLoader(depMap) {
         require.config({
             loader: function(dep) {

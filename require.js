@@ -33,24 +33,6 @@ if (!Object.assign) {
         });
         return result;
     }
-    function asyncMap(deps, fn) {
-        return new Promise(function(resolve, reject) {
-            var i = -1,
-                results = [];
-            function call() {
-                i++;
-                if(i == deps.length)
-                    resolve(results);
-                else {
-                    fn(deps[i]).then(function(result) {
-                        results.push(result);
-                        call();
-                    }, reject)
-                }
-            }
-            call();
-        });
-    }
     function loadDep(dep, path) {
         var deferred = flatDeferred();
         deferred.name = dep;
@@ -72,9 +54,9 @@ if (!Object.assign) {
 
     function require(deps, factory, path/*only internal*/) {
         path = path || [];
-        return asyncMap(deps, function(dep) {
+        return Promise.all(deps.map(function(dep) {
             if(locals[dep]) {
-                return Promise.resolve(locals[dep](currentRequire));
+                return locals[dep](currentRequire);
             }
             else {
                 if(path.indexOf(dep) > -1) {
@@ -90,7 +72,7 @@ if (!Object.assign) {
                 }
                 return modules[dep];
             }
-        }).then(function(deps) {
+        })).then(function(deps) {
             return factory.apply(null, deps)
         }, function(reason) {
             if(reason instanceof Error) {
@@ -115,7 +97,7 @@ if (!Object.assign) {
         modules = require.modules = {};
         scriptQueue = Promise.resolve();
     };
-    var currentRequire, predefines, config, scriptQueue, modules = require.modules,
+    var currentRequire, predefines, config, scriptQueue, modules,
         locals = {
             module: function moduleFactory(currentRequire) {
                 currentRequire = currentRequire || {};
