@@ -66,7 +66,7 @@ if (!Object.assign) {
             }
             else {
                 if(path.indexOf(dep) > -1) {
-                    throw new Error('Circular dependency: '+path.concat(dep).join(' -> '))
+                    return Promise.reject(new Error('Circular dependency: '+path.concat(dep).join(' -> ')));
                 }
                 var newPath = path.concat(dep);
                 if(predefines[dep]) {

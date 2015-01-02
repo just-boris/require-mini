@@ -1,6 +1,5 @@
 module.exports = function(config) {
-  config.set({
-
+  var options = {
     basePath: '',
     frameworks: ['jasmine'],
     files: [
@@ -13,5 +12,16 @@ module.exports = function(config) {
     autoWatch: true,
     browsers: ['Chrome'],
     singleRun: true
-  });
+  };
+  if(process.env.coverage) {
+    options.reporters.push('coverage');
+    options.preprocessors = {
+      'require.js': ['coverage']
+    };
+    options.coverageReporter = {
+      type : 'html',
+      dir : 'coverage/'
+    };
+  }
+  config.set(options);
 };
