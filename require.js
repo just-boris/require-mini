@@ -121,22 +121,21 @@ if (!Object.assign) {
                         plugin = parts.shift();
                     deferred.name = parts.join('!');
                     return require([plugin], function(plugin) {
-                        invokeScript(deferred, function() {
-                            return new Promise(function (resolve, reject) {
-                                var callback = function(value) {
-                                    currentRequire.resolve(value);
-                                    resolve(value);
-                                };
-                                callback.error = function(e) {
-                                    currentRequire.reject(e);
-                                    reject(e);
-                                };
-                                callback.fromText = function(scriptText) {
+                        return new Promise(function (resolve, reject) {
+                            var callback = function(value) {
+                                deferred.resolve(value);
+                                resolve(value);
+                            };
+                            callback.error = function(e) {
+                                deferred.reject(e);
+                                reject(e);
+                            };
+                            callback.fromText = function(scriptText) {
+                                return invokeScript(deferred, function() {
                                     (new Function(scriptText))();
-                                    resolve();
-                                };
-                                plugin.load(deferred.name, require, callback, {isBuild: false})
-                            })
+                                });
+                            };
+                            plugin.load(deferred.name, require, callback, {isBuild: false})
                         });
                     });
                 }
