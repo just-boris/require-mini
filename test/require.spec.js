@@ -117,35 +117,45 @@ describe('errors', function() {
     });
 });
 
-xdescribe("script loader", function() {
-    function createFakeLoader(depMap) {
-        require.config({
-            loader: function(dep) {
-                console.info('requesting: '+dep);
-                return new Promise(function(resolve) {
-                    setTimeout(function() {
-                        define.apply(this, depMap[dep]);
-                        resolve();
-                    }, 10);
-                });
+describe("loader", function() {
+    beforeEach(function () {
+        this.depMap = {};
+        var self = this;
+        define('test-loader', function() {
+            function getDefinition(dep) {
+                return self.depMap[dep].map(function(arg) {
+                    if(typeof arg === 'function') {
+                        return arg.toString();
+                    }
+                    if(Array.isArray(arg)) {
+                        return JSON.stringify(arg);
+                    }
+                })
             }
-        });
-    }
+            return {
+                load: function(dep, require, cb) {
+                    setTimeout(function() {
+                        cb.fromText('define('+getDefinition(dep)+')');
+                    }, 10);
+                }
+            }
+        })
+    });
 
     it("should load modules", function (done) {
-        createFakeLoader({
+        this.depMap = {
             A: [function() {return 'A'}],
-            B: [['A'], function(A) {
+            B: [['test-loader!A'], function(A) {
                 return new Promise(function(resolve) {
                     resolve(A+'B');
                 })
             }],
-            C: [['A', 'B'], function(A, B) {
+            C: [['test-loader!A', 'test-loader!B'], function(A, B) {
                 return 'C' + B + A;
             }]
-        });
+        };
 
-        require(['C'], function(C) {
+        require(['test-loader!C'], function(C) {
             expect(C).toEqual('CABA');
             done();
         });

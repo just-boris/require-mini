@@ -40,6 +40,12 @@ if (!Object.assign) {
         config.loader(deferred).catch(deferred.reject);
         return deferred.promise;
     }
+    function errorHandler(reason) {
+        if(reason instanceof Error) {
+            console.error(reason.stack);
+        }
+        return Promise.reject(reason);
+    }
     function invokeScript(context, func) {
         return scriptQueue = scriptQueue.then(function() {
             if(currentRequire) {
@@ -49,7 +55,7 @@ if (!Object.assign) {
             return func();
         }).then(function() {
             currentRequire = null;
-        });
+        }, errorHandler);
     }
 
     function require(deps, factory, path/*only internal*/) {
@@ -74,12 +80,7 @@ if (!Object.assign) {
             }
         })).then(function(deps) {
             return factory.apply(null, deps)
-        }, function(reason) {
-            if(reason instanceof Error) {
-                console.error(reason.stack);
-            }
-            return Promise.reject(reason);
-        });
+        }, errorHandler);
     }
     require.config = function(newConfig) {
         config = Object.assign(Object.create(config), newConfig);
