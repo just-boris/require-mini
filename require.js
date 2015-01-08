@@ -48,9 +48,6 @@ if (!Object.assign) {
     }
     function invokeScript(context, func) {
         return scriptQueue = scriptQueue.then(function() {
-            if(currentRequire) {
-                throw new Error('Module '+currentRequire.name+' already loading')
-            }
             currentRequire = context;
             return func();
         }).then(function() {
@@ -58,11 +55,10 @@ if (!Object.assign) {
         }, errorHandler);
     }
 
-    function require(deps, factory, path/*only internal*/) {
-        path = path || [];
+    function _require(deps, factory, path) {
         return Promise.all(deps.map(function(dep) {
             if(locals[dep]) {
-                return locals[dep](currentRequire);
+                return locals[dep](currentRequire || {name: path.slice(-1)[0]});
             }
             else {
                 if(path.indexOf(dep) > -1) {
@@ -72,15 +68,18 @@ if (!Object.assign) {
                 if(predefines[dep]) {
                     var definition = predefines[dep].concat([newPath]);
                     delete predefines[dep];
-                    modules[dep] = require.apply(null, definition);
+                    modules[dep] = _require.apply(null, definition);
                 } else if(!modules[dep]) {
                     modules[dep] = loadDep(dep, newPath);
                 }
                 return modules[dep];
             }
         })).then(function(deps) {
-            return factory.apply(null, deps)
+            return typeof factory === 'function' ? factory.apply(null, deps) : factory;
         }, errorHandler);
+    }
+    function require(deps, factory) {
+        return _require(deps, factory, []);
     }
     require.config = function(newConfig) {
         config = Object.assign(Object.create(config), newConfig);
@@ -88,9 +87,6 @@ if (!Object.assign) {
     require.toUrl = function(name) {
         var hasExt = name.split('.').length > 1;
         return (config.paths[name] || config.baseUrl + name) + (hasExt ? '' : '.js');
-    };
-    require.defined = function(name) {
-        return !!modules[name];
     };
     require.reset = function() {
         predefines = {};
@@ -101,7 +97,6 @@ if (!Object.assign) {
     var currentRequire, predefines, config, scriptQueue, modules,
         locals = {
             module: function moduleFactory(currentRequire) {
-                currentRequire = currentRequire || {};
                 return {
                     id: currentRequire.name,
                     uri: currentRequire.url,
@@ -109,10 +104,13 @@ if (!Object.assign) {
                         return config.config[currentRequire.name] || {};
                     }
                 }
+            },
+            require: function requireFactory() {
+                return require;
             }
         },
         defaultConfig = {
-            baseUrl: '',
+            baseUrl: './',
             paths: {},
             shim: {},
             config: {},
@@ -136,7 +134,7 @@ if (!Object.assign) {
                                     (new Function(scriptText))();
                                 });
                             };
-                            plugin.load(deferred.name, require, callback, {isBuild: false})
+                            plugin.load(deferred.name, locals.require(), callback, {isBuild: false})
                         });
                     });
                 }
@@ -175,9 +173,11 @@ if (!Object.assign) {
             throw new Error('Unexpected define!');
         }
         if (currentRequire && (currentRequire.name == name || !name)) {
-            currentRequire.resolve(require(deps, factory, currentRequire.path));
+            currentRequire.resolve(_require(deps, factory, currentRequire.path));
         } else {
             predefines[name] = [deps, factory];
         }
     };
+    //can't assert this now, because we have differences in some things
+    //define.amd = {};
 })(window);

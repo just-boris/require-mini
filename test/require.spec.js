@@ -4,6 +4,15 @@ beforeEach(function () {
 });
 
 describe('resolving', function() {
+    it("should define module without factory function", function (done) {
+        var A = {module: 'A'};
+        define('A', A);
+
+        require(['A'], function(_A) {
+            expect(_A).toEqual(A);
+            done();
+        })
+    });
 
     it('should properly resolve dependencies (synchronously)', function(done) {
         define('A', function() {
@@ -117,7 +126,7 @@ describe('errors', function() {
     });
 });
 
-describe("loader", function() {
+describe("custom loader", function() {
     beforeEach(function () {
         this.depMap = {};
         var self = this;
@@ -160,5 +169,87 @@ describe("loader", function() {
             done();
         });
     });
+});
 
+describe("plugins", function () {
+    it("should load module through plugins", function (done) {
+        define('test-loader', function() {
+            var fakeLoad = jasmine.createSpy('fakeLoad').and.callFake(function(dep, req, cb) {
+                cb(dep);
+            });
+            return {
+                load: fakeLoad
+            };
+        });
+        require(['test-loader', 'test-loader!A'], function(plugin, A) {
+            expect(A).toBe('A');
+            expect(plugin.load).toHaveBeenCalled();
+            done();
+        });
+    });
+
+    it("should can report error while loading module through plugin", function (done) {
+        define('test-loader', function() {
+            return {
+                load: function(dep, req, cb) {
+                    return cb.error('Error while loading ' + dep)
+                }
+            };
+        });
+        require(['test-loader!A'], function() {}).catch(function(e) {
+            expect(e).toBe('Error while loading A');
+            done();
+        });
+    });
+});
+describe("url builder", function () {
+    it("should apply custom base url", function () {
+        require.config({
+            baseUrl: './modules/'
+        });
+        expect(require.toUrl('A')).toBe('./modules/A.js');
+    });
+
+    it("should load plugin from custom path", function () {
+        require.config({
+            paths: {
+                A: 'http://cdn/with/A'
+            }
+        });
+        expect(require.toUrl('A')).toBe('http://cdn/with/A.js');
+    });
+
+    it("should not add extension when it is already there", function () {
+        expect(require.toUrl('A.json')).toBe('./A.json');
+    });
+});
+
+describe("local module", function () {
+    it("should pass module config inside", function (done) {
+        define('A', ['module'], function(module) {
+            return module;
+        });
+
+        require(['A'], function(moduleA) {
+            expect(moduleA.id).toBe('A');
+            done();
+        });
+    });
+
+    it("should add module config", function (done) {
+        require.config({
+            config: {
+                A: {key: 'value'}
+            }
+        });
+
+        define('A', ['module'], function(module) {
+            return module;
+        });
+
+        require(['A'], function(moduleA) {
+            expect(moduleA.config()).toEqual({key: 'value'});
+            done();
+        });
+    });
 });
