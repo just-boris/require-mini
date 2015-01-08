@@ -25,7 +25,7 @@ if (!Object.assign) {
 }
 (function(global) {
     "use strict";
-    function flatDeferred() {
+    function makeDeferred() {
         var result = {};
         result.promise = new Promise(function(resolve, reject) {
             result.resolve = resolve;
@@ -33,26 +33,73 @@ if (!Object.assign) {
         });
         return result;
     }
-    function loadDep(dep, path) {
-        var deferred = flatDeferred();
-        deferred.name = dep;
-        deferred.path = path;
-        config.loader(deferred).catch(deferred.reject);
-        return deferred.promise;
-    }
     function errorHandler(reason) {
         if(reason instanceof Error) {
             console.error(reason.stack);
         }
         return Promise.reject(reason);
     }
-    function invokeScript(context, func) {
+    function invokeQueue(context, func) {
         return scriptQueue = scriptQueue.then(function() {
             currentRequire = context;
             return func();
         }).then(function() {
             currentRequire = null;
         }, errorHandler);
+    }
+    function loadDep(dep, path) {
+        var deferred = makeDeferred();
+        deferred.name = dep;
+        deferred.path = path;
+        if(dep.indexOf('!') > -1) {
+            loadByPlugin(deferred);
+        } else {
+            loadScript(deferred);
+        }
+        return deferred.promise;
+    }
+    function loadByPlugin(deferred) {
+        var parts = deferred.name.split('!'),
+            plugin = parts.shift();
+        deferred.name = parts.join('!');
+        return require([plugin], function(plugin) {
+            return new Promise(function (resolve, reject) {
+                var callback = function(value) {
+                    deferred.resolve(value);
+                    resolve(value);
+                };
+                callback.error = function(e) {
+                    deferred.reject(e);
+                    reject(e);
+                };
+                callback.fromText = function(scriptText) {
+                    return invokeQueue(deferred, function() {
+                        (new Function(scriptText))();
+                    });
+                };
+                plugin.load(deferred.name, locals.require(), callback, {isBuild: false})
+            });
+        });
+    }
+    function loadScript(deferred) {
+        return invokeQueue(deferred, function() {
+            return new Promise(function(resolve, reject) {
+                var el = document.createElement("script");
+                el.onload = function() {
+                    if(config.shim[deferred.name]) {
+                        currentRequire.resolve(global[config.shim[deferred.name].exports]);
+                    }
+                    resolve();
+                };
+                el.onerror = function(e) {
+                    deferred.reject(e);
+                    reject(e);
+                };
+                el.async = true;
+                el.src = currentRequire.url = require.toUrl(deferred.name);
+                document.getElementsByTagName('body')[0].appendChild(el);
+            });
+        });
     }
 
     function _require(deps, factory, path) {
@@ -90,7 +137,12 @@ if (!Object.assign) {
     };
     require.reset = function() {
         predefines = {};
-        config = defaultConfig;
+        config = {
+            baseUrl: './',
+            paths: {},
+            shim: {},
+            config: {}
+        };
         modules = require.modules = {};
         scriptQueue = Promise.resolve();
     };
@@ -107,53 +159,6 @@ if (!Object.assign) {
             },
             require: function requireFactory() {
                 return require;
-            }
-        },
-        defaultConfig = {
-            baseUrl: './',
-            paths: {},
-            shim: {},
-            config: {},
-            loader: function loadScript(deferred) {
-                if(deferred.name.indexOf('!') > -1) {
-                    var parts = deferred.name.split('!'),
-                        plugin = parts.shift();
-                    deferred.name = parts.join('!');
-                    return require([plugin], function(plugin) {
-                        return new Promise(function (resolve, reject) {
-                            var callback = function(value) {
-                                deferred.resolve(value);
-                                resolve(value);
-                            };
-                            callback.error = function(e) {
-                                deferred.reject(e);
-                                reject(e);
-                            };
-                            callback.fromText = function(scriptText) {
-                                return invokeScript(deferred, function() {
-                                    (new Function(scriptText))();
-                                });
-                            };
-                            plugin.load(deferred.name, locals.require(), callback, {isBuild: false})
-                        });
-                    });
-                }
-                return invokeScript(deferred, function() {
-                    return new Promise(function(resolve, reject) {
-                        var el = document.createElement("script");
-                        el.onload = function() {
-                            if(config.shim[deferred.name]) {
-                                currentRequire.resolve(global[config.shim[deferred.name].exports]);
-                                delete global[config.shim[deferred.name]];
-                            }
-                            resolve();
-                        };
-                        el.onerror = reject;
-                        el.async = true;
-                        el.src = currentRequire.url = require.toUrl(deferred.name);
-                        document.getElementsByTagName('body')[0].appendChild(el);
-                    });
-                });
             }
         };
     require.reset();
