@@ -1,14 +1,24 @@
-var modules = {};
+var modules = {},
+    pendingModules = {};
+
+function defer() {
+    var result = {};
+    result.promise = new Promise(function(resolve, reject) {
+        result.resolve = resolve;
+        result.reject = reject;
+    });
+    return result;
+}
 
 function loadScript(name) {
-    return new Promise(function (resolve, reject) {
-        var el = document.createElement("script");
-        el.onload = resolve;
-        el.onerror = reject;
-        el.async = true;
-        el.src = './' + name + '.js';
-        document.getElementsByTagName('body')[0].appendChild(el);
-    });
+    var deferred = defer(),
+        el = document.createElement("script");
+    pendingModules[name] = deferred;
+    el.onerror = deferred.reject;
+    el.async = true;
+    el.src = './' + name + '.js';
+    document.getElementsByTagName('body')[0].appendChild(el);
+    return deferred.promise;
 }
 function require(deps, factory) {
     return Promise.all(deps.map(function (dependency) {
@@ -19,4 +29,14 @@ function require(deps, factory) {
     })).then(function (modules) {
         return factory.apply(null, modules);
     });
+}
+
+function define(name, factory) {
+    var module = factory();
+    if(pendingModules[name]) {
+        pendingModules[name].resolve(module);
+        delete pendingModules[name];
+    } else {
+        modules[name] = module;
+    }
 }

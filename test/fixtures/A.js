@@ -1,1 +1,3 @@
-window.A = 'module A';
+define('base/test/fixtures/A', function() {
+    return 'module A';
+});
