@@ -1,0 +1,1 @@
+window.A = 'module A';
