@@ -1,0 +1,15 @@
+{
+  "name": "require",
+  "version": "0.0.0",
+  "homepage": "https://github.com/just-boris/requirejs",
+  "authors": [
+    "just-boris <just-boris@hotmail.com>"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test"
+  ]
+}
