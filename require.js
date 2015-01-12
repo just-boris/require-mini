@@ -31,8 +31,12 @@ function require(deps, factory) {
     });
 }
 
-function define(name, factory) {
-    var module = factory();
+function define(name, deps, factory) {
+    if(!Array.isArray(deps)) {
+        factory = deps;
+        deps = [];
+    }
+    var module = require(deps, factory);
     if(pendingModules[name]) {
         pendingModules[name].resolve(module);
         delete pendingModules[name];
