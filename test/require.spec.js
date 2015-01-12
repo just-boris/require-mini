@@ -29,4 +29,13 @@ describe("reqiure", function() {
             done();
         });
     });
+
+    it("should detect circular dependency", function (done) {
+        var onLoad = jasmine.createSpy('onLoad');
+        require(['base/test/fixtures/circular A'], onLoad).catch(function(error) {
+            expect(onLoad).not.toHaveBeenCalled();
+            expect(error.message).toMatch('Circular dependency: ');
+            done();
+        });
+    });
 });
