@@ -1,6 +1,3 @@
-var modules = {},
-    pendingModules = {};
-
 function defer() {
     var result = {};
     result.promise = new Promise(function(resolve, reject) {
@@ -9,19 +6,33 @@ function defer() {
     });
     return result;
 }
+function invokeLater(context, fn) {
+    lastTask = lastTask.then(function() {
+        pendingModule = context;
+        return fn();
+    }).then(cleanup, cleanup);
+    function cleanup() {
+        pendingModule = null;
+    }
+}
 
 function loadScript(name, path) {
-    var deferred = defer(),
-        el = document.createElement("script");
+    var deferred = defer();
+    deferred.name = name;
     deferred.path = path.concat(name);
-    pendingModules[name] = deferred;
-    el.onerror = function() {
-        delete pendingModules[name];
-        deferred.reject(new Error('Error while loading module "'+name+'"'));
-    };
-    el.async = true;
-    el.src = './' + name + '.js';
-    document.getElementsByTagName('body')[0].appendChild(el);
+    invokeLater(deferred, function() {
+        return new Promise(function(resolve, reject) {
+            var el = document.createElement("script");
+            el.onerror = function() {
+                reject();
+                deferred.reject(new Error('Error while loading module "'+name+'"'));
+            };
+            el.onload = resolve;
+            el.async = true;
+            el.src = './' + name + '.js';
+            document.getElementsByTagName('body')[0].appendChild(el);
+        });
+    });
     return deferred.promise;
 }
 function _require(deps, factory, errback, path) {
@@ -48,17 +59,30 @@ function _require(deps, factory, errback, path) {
 function require(deps, factory, errback) {
     return _require(deps, factory, errback, []);
 }
+var modules, lastTask, pendingModule;
+require.resetContext = function() {
+    modules = {};
+    lastTask = Promise.resolve();
+    pendingModule = null;
+};
+require.resetContext();
 
 function define(name, deps, factory) {
+    if(typeof name !== 'string') {
+        factory = deps;
+        deps = name;
+        name = null;
+    }
     if(!Array.isArray(deps)) {
         factory = deps;
         deps = [];
     }
-    var deferred = pendingModules[name];
-    if(deferred) {
+    var deferred = pendingModule;
+    if(name === null && !deferred) {
+        throw new Error('Unexpected define!');
+    } else if (name === null || deferred && deferred.name === name) {
         var module = _require(deps, factory, deferred.reject, deferred.path);
         deferred.resolve(module);
-        delete pendingModules[name];
     } else {
         modules[name] = _require(deps, factory, null, []);
     }

@@ -1,8 +1,8 @@
 beforeEach(function () {
-    modules = {};
+    require.resetContext();
 });
 afterEach(function () {
-    expect(Object.keys(pendingModules).length).toBe(0);
+    expect(pendingModule).toBeNull();
 });
 
 describe("reqiure", function() {
@@ -10,14 +10,14 @@ describe("reqiure", function() {
         require(['base/test/fixtures/A', 'base/test/fixtures/B'], function (A, B) {
             expect(A).toBe("module A");
             expect(B).toBe("module B");
-            done();
+            setTimeout(done);
         });
     });
 
     it("should load modules with dependencies", function (done) {
         require(['base/test/fixtures/C'], function (C) {
             expect(C).toBe("module C with module A");
-            done();
+            setTimeout(done);
         });
     });
 
@@ -27,7 +27,7 @@ describe("reqiure", function() {
         });
         require(['C'], function (C) {
             expect(C).toBe('module C');
-            done();
+            setTimeout(done);
         });
     });
 });
@@ -38,7 +38,7 @@ describe('error handling', function() {
         require(['no-module'], onLoad, function(error) {
             expect(onLoad).not.toHaveBeenCalled();
             expect(error.message).toEqual('Error while loading module "no-module"');
-            done();
+            setTimeout(done);
         });
     });
 
@@ -47,7 +47,13 @@ describe('error handling', function() {
         require(['base/test/fixtures/circular A'], onLoad, function(error) {
             expect(onLoad).not.toHaveBeenCalled();
             expect(error.message).toMatch('Circular dependency: ');
-            done();
+            setTimeout(done);
         });
+    });
+
+    it("should throw exception on unknown defines", function () {
+        expect(function() {
+            define(function() {});
+        }).toThrowError('Unexpected define!');
     });
 });
