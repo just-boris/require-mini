@@ -19,7 +19,7 @@ function invokeLater(context, fn) {
 function loadScript(name, path) {
     var deferred = defer();
     deferred.name = name;
-    deferred.path = path.concat(name);
+    deferred.path = path;
     invokeLater(deferred, function() {
         return new Promise(function(resolve, reject) {
             var el = document.createElement("script");
@@ -40,8 +40,12 @@ function _require(deps, factory, errback, path) {
         if(path.indexOf(dependency) > -1) {
             return Promise.reject(new Error('Circular dependency: '+path.concat(dependency).join(' -> ')));
         }
-        if (!modules[dependency]) {
-            modules[dependency] = loadScript(dependency, path);
+        var newPath = path.concat(dependency);
+        if(predefines[dependency]) {
+            modules[dependency] = _require.apply(null, predefines[dependency].concat([newPath]))
+        }
+        else if (!modules[dependency]) {
+            modules[dependency] = loadScript(dependency, newPath);
         }
         return modules[dependency];
     })).then(function (modules) {
@@ -59,9 +63,10 @@ function _require(deps, factory, errback, path) {
 function require(deps, factory, errback) {
     return _require(deps, factory, errback, []);
 }
-var modules, lastTask, pendingModule;
+var modules, predefines, lastTask, pendingModule;
 require.resetContext = function() {
     modules = {};
+    predefines = {};
     lastTask = Promise.resolve();
     pendingModule = null;
 };
@@ -84,6 +89,6 @@ function define(name, deps, factory) {
         var module = _require(deps, factory, deferred.reject, deferred.path);
         deferred.resolve(module);
     } else {
-        modules[name] = _require(deps, factory, null, []);
+        predefines[name] = [deps, factory, null];
     }
 }

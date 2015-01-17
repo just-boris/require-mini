@@ -30,6 +30,19 @@ describe("reqiure", function() {
             setTimeout(done);
         });
     });
+
+    it("should not load dependencies before require", function (done) {
+        define('A', ['B'], function () {
+            return 'module A';
+        });
+        define('B', function () {
+            return 'module B';
+        });
+        require(['A'], function (A) {
+            expect(A).toBe('module A');
+            setTimeout(done);
+        });
+    });
 });
 
 describe('error handling', function() {
@@ -43,8 +56,11 @@ describe('error handling', function() {
     });
 
     it("should detect circular dependency", function (done) {
+        define('A', ['B'], function() {});
+        define('B', ['C'], function() {});
+        define('C', ['A'], function() {});
         var onLoad = jasmine.createSpy('onLoad');
-        require(['base/test/fixtures/circular A'], onLoad, function(error) {
+        require(['A'], onLoad, function(error) {
             expect(onLoad).not.toHaveBeenCalled();
             expect(error.message).toMatch('Circular dependency: ');
             setTimeout(done);
