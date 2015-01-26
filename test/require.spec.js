@@ -1,5 +1,6 @@
 beforeEach(function () {
     require.resetContext();
+    spyOn(require, 'onError');
 });
 afterEach(function () {
     expect(pendingModule).toBeNull();
@@ -51,7 +52,7 @@ describe('error handling', function() {
         require(['no-module'], onLoad, function(error) {
             expect(onLoad).not.toHaveBeenCalled();
             expect(error.message).toEqual('Error while loading module "no-module"');
-            setTimeout(done);
+            setTimeout(done, 1);
         });
     });
 
@@ -71,5 +72,18 @@ describe('error handling', function() {
         expect(function() {
             define(function() {});
         }).toThrowError('Unexpected define!');
+    });
+});
+
+describe("utils", function () {
+    it("toUrl", function () {
+        expect(require.toUrl('A')).toBe('./A');
+    });
+
+    it("specified", function () {
+        expect(require.specified('A')).toBeFalsy();
+        define('A', function() {});
+        require(['A']);
+        expect(require.specified('A')).toBeTruthy();
     });
 });

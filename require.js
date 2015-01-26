@@ -29,7 +29,7 @@ function loadScript(name, path) {
             };
             el.onload = resolve;
             el.async = true;
-            el.src = './' + name + '.js';
+            el.src = toUrl(name, true);
             document.getElementsByTagName('body')[0].appendChild(el);
         });
     });
@@ -53,9 +53,8 @@ function _require(deps, factory, errback, path) {
     }, function(reason) {
         if(typeof errback === 'function') {
             errback(reason);
-        } else {
-            console.error(reason);
         }
+        require.onError(reason);
         return Promise.reject(reason);
     });
 }
@@ -70,6 +69,20 @@ require.resetContext = function() {
     lastTask = Promise.resolve();
     pendingModule = null;
 };
+
+function toUrl(name, appendJS) {
+    return './' + name + (appendJS ? '.js' : '');
+}
+require.toUrl = function(name) {
+    return toUrl(name, false);
+};
+require.specified = function(name) {
+    return modules.hasOwnProperty(name);
+};
+require.onError = function(reason) {
+    console.error(reason);
+};
+
 require.resetContext();
 
 function define(name, deps, factory) {
