@@ -1,3 +1,3 @@
-define('base/test/fixtures/A', function() {
+define('A', function() {
     return 'module A';
 });

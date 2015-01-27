@@ -1,5 +1,8 @@
 beforeEach(function () {
     require.resetContext();
+    require.config({
+        baseUrl: './base/test/fixtures/'
+    });
     spyOn(require, 'onError');
 });
 afterEach(function () {
@@ -8,15 +11,27 @@ afterEach(function () {
 
 describe("reqiure", function() {
     it("should require modules", function (done) {
-        require(['base/test/fixtures/A', 'base/test/fixtures/B'], function (A, B) {
+        require(['A', 'B'], function (A, B) {
             expect(A).toBe("module A");
             expect(B).toBe("module B");
             setTimeout(done);
         });
     });
 
+    it("should not load same module twice", function (done) {
+        spyOn(window, 'loadScript').and.callThrough();
+        require(['A'], function (A1) {
+            require(['A'], function(A2) {
+                expect(A1).toBe(A2);
+                expect(A2).toBe("module A");
+                expect(window.loadScript.calls.count()).toBe(1);
+                setTimeout(done);
+            });
+        });
+    });
+
     it("should load modules with dependencies", function (done) {
-        require(['base/test/fixtures/C'], function (C) {
+        require(['C'], function (C) {
             expect(C).toBe("module C with module A");
             setTimeout(done);
         });
@@ -43,6 +58,27 @@ describe("reqiure", function() {
             expect(A).toBe('module A');
             setTimeout(done);
         });
+    });
+
+    it("loading by shim", function (done) {
+        require.config({
+            shim: {
+                'no-AMD': {
+                    init: function() {
+                        return window.noAMD
+                    }
+                },
+                'no-AMD-plugin': {
+                    deps: ['no-AMD'],
+                    exports: 'noAMD.plugin'
+                }
+            }
+        });
+        require(['no-AMD-plugin'], function(plugin) {
+            expect(plugin).toBe('no-AMD plugin');
+            delete window.noAmd;
+            done();
+        })
     });
 });
 
@@ -76,8 +112,40 @@ describe('error handling', function() {
 });
 
 describe("utils", function () {
-    it("toUrl", function () {
-        expect(require.toUrl('A')).toBe('./A');
+
+    describe("toUrl", function () {
+        it("simple", function () {
+            expect(require.toUrl('A')).toBe('./base/test/fixtures/A');
+        });
+
+        it("for bundle", function () {
+            require.config({
+                baseUrl: './js/',
+                bundles: {
+                    pack: ['A', 'B']
+                }
+            });
+            expect(require.toUrl('A')).toBe('./js/pack');
+            expect(require.toUrl('B')).toBe('./js/pack');
+            expect(require.toUrl('C')).toBe('./js/C');
+        });
+
+        it("with paths", function () {
+            require.config({
+                paths: {
+                    'jQuery': '//yastatic.net/jquery/2.1.3/jquery.min'
+                }
+            });
+            expect(require.toUrl('jQuery')).toBe('//yastatic.net/jquery/2.1.3/jquery.min');
+        });
+
+        it("with urlArgs", function () {
+            require.config({
+                baseUrl: './js/',
+                urlArgs: 'v=1.0'
+            });
+            expect(require.toUrl('A')).toBe('./js/A?v=1.0');
+        });
     });
 
     it("specified", function () {
