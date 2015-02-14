@@ -98,24 +98,26 @@ function loadScript(name) {
 }
 function _require(deps, factory, errback, path) {
     var currentModule = path.slice(-1)[0];
-    return Promise.all(deps.map(function (dependency) {
-        if(path.indexOf(dependency) > -1) {
-            return Promise.reject(new Error('Circular dependency: '+path.concat(dependency).join(' -> ')));
-        }
-        var newPath = path.concat(dependency);
-        if(locals[dependency]) {
-            return locals[dependency](currentModule);
-        }
-        if(predefines[dependency]) {
-            modules[dependency] = Promise.resolve().then(function() {
-                return _require.apply(null, predefines[dependency].concat([newPath]));
-            });
-        }
-        else if (!modules[dependency]) {
-            modules[dependency] = loadDep(dependency, newPath);
-        }
-        return modules[dependency];
-    })).then(function (instances) {
+    return new Promise(function(resolve, reject) {
+        Promise.all(deps.map(function (dependency) {
+            if(path.indexOf(dependency) > -1) {
+                return Promise.reject(new Error('Circular dependency: '+path.concat(dependency).join(' -> ')));
+            }
+            var newPath = path.concat(dependency);
+            if(locals[dependency]) {
+                return locals[dependency](currentModule);
+            }
+            if(predefines[dependency]) {
+                modules[dependency] = Promise.resolve().then(function() {
+                    return _require.apply(null, predefines[dependency].concat([newPath]));
+                });
+            }
+            else if (!modules[dependency]) {
+                modules[dependency] = loadDep(dependency, newPath);
+            }
+            return modules[dependency];
+        })).then(resolve, reject);
+    }).then(function (instances) {
         var result = factory.apply(null, instances);
         return currentModule && modules[currentModule].module && modules[currentModule].module.exports || result;
     }, function(reason) {

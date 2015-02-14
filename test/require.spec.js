@@ -171,6 +171,13 @@ describe('error handling', function() {
             define(function() {});
         }).toThrowError('Unexpected define!');
     });
+
+    it("should not allow to require 'module' on top level", function (done) {
+        require(['module'], function () {}, function(error) {
+            expect(error.message).toBe('Module "module" should be required only by modules');
+            setTimeout(done);
+        })
+    });
 });
 
 describe("utils", function () {
