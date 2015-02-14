@@ -3,7 +3,6 @@ beforeEach(function () {
     require.config({
         baseUrl: './base/test/fixtures/'
     });
-    spyOn(require, 'onError');
 });
 afterEach(function () {
     expect(pendingModule).toBeNull();
@@ -82,7 +81,70 @@ describe("reqiure", function() {
     });
 });
 
+describe("module locals", function () {
+    it("should can inject require", function (done) {
+        define('A', ['require'], function(require) {
+           return require(['B'], function(B) {return 'A'+B;});
+        });
+        define('B', function() {
+            return 'B'
+        });
+        require(['A'], function(A) {
+            expect(A).toBe('AB');
+            done();
+        });
+    });
+
+    it("should can inject module and its config", function (done) {
+        require.config({
+            config: {
+                'A': 'a message for A'
+            }
+        });
+        define('A', ['module'], function(module) {
+            return module;
+        });
+        require(['A'], function(A) {
+            expect(A.id).toBe('A');
+            expect(A.config()).toBe('a message for A');
+            done();
+        });
+    });
+
+    it("should return empty object when there is no config", function (done) {
+        define('A', ['module'], function(module) {
+            return module;
+        });
+        require(['A'], function(A) {
+            expect(A.config()).toEqual({});
+            done();
+        });
+    });
+
+    it("should can export values through exports or module.exports", function (done) {
+        define('A', ['module'], function(module) {
+            module.exports = 'whole A module'
+        });
+        define('B', ['exports'], function(exports) {
+            exports.name = 'B'
+        });
+        define('C', ['module', 'exports'], function(module, exports) {
+            module.exports.a = 'a';
+            exports.b = 'b';
+        });
+        require(['A', 'B', 'C'], function(A, B, C) {
+            expect(A).toBe('whole A module');
+            expect(B).toEqual({name: 'B'});
+            expect(C).toEqual({a: 'a', b: 'b'});
+            done();
+        });
+    });
+});
+
 describe('error handling', function() {
+    beforeEach(function () {
+        spyOn(require, 'onError');
+    });
     it("should report about error in load scripts", function (done) {
         var onLoad = jasmine.createSpy('onLoad');
         require(['no-module'], onLoad, function(error) {
@@ -151,7 +213,7 @@ describe("utils", function () {
     it("specified", function () {
         expect(require.specified('A')).toBeFalsy();
         define('A', function() {});
-        require(['A']);
+        require(['A'], function() {});
         expect(require.specified('A')).toBeTruthy();
     });
 });

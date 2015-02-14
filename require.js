@@ -97,20 +97,27 @@ function loadScript(name) {
     });
 }
 function _require(deps, factory, errback, path) {
+    var currentModule = path.slice(-1)[0];
     return Promise.all(deps.map(function (dependency) {
         if(path.indexOf(dependency) > -1) {
             return Promise.reject(new Error('Circular dependency: '+path.concat(dependency).join(' -> ')));
         }
         var newPath = path.concat(dependency);
+        if(locals[dependency]) {
+            return locals[dependency](currentModule);
+        }
         if(predefines[dependency]) {
-            modules[dependency] = _require.apply(null, predefines[dependency].concat([newPath]))
+            modules[dependency] = Promise.resolve().then(function() {
+                return _require.apply(null, predefines[dependency].concat([newPath]));
+            });
         }
         else if (!modules[dependency]) {
             modules[dependency] = loadDep(dependency, newPath);
         }
         return modules[dependency];
-    })).then(function (modules) {
-        return factory.apply(null, modules);
+    })).then(function (instances) {
+        var result = factory.apply(null, instances);
+        return currentModule && modules[currentModule].module && modules[currentModule].module.exports || result;
     }, function(reason) {
         if(typeof errback === 'function') {
             errback(reason);
@@ -123,14 +130,35 @@ function _require(deps, factory, errback, path) {
 function require(deps, factory, errback) {
     return _require(deps, factory, errback, []);
 }
-var modules, predefines, config, lastTask, pendingModule;
+var modules, predefines, config, lastTask, pendingModule,
+    locals = {
+        require: function(moduleName) {
+            return require;
+        },
+        module: function(moduleName) {
+            var module = modules[moduleName];
+            if(!module) {
+                throw new Error('Module "module" should be required only by modules')
+            }
+            return (module.module = module.module || {
+                id: moduleName,
+                config: function () {
+                    return config.config[moduleName] || {};
+                }
+            });
+        },
+        exports: function(moduleName) {
+            return (locals.module(moduleName).exports = {});
+        }
+    };
 require.resetContext = function() {
     config = {
         urlArgs: '',
         baseUrl: './',
         paths: {},
         shim: {},
-        bundles: {}
+        bundles: {},
+        config: {}
     };
     modules = {};
     predefines = {};
