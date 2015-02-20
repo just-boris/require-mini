@@ -5,7 +5,8 @@ module.exports = function(config) {
     files: [
       'require.js',
       'test/*.spec.js',
-      {pattern: 'test/fixtures/**', included: false}
+      {pattern: 'test/fixtures/**', included: false},
+      {pattern: 'bower_components/**', included: false}
     ],
     reporters: ['progress'],
     port: 9876,

@@ -11,5 +11,8 @@
     "node_modules",
     "bower_components",
     "test"
-  ]
+  ],
+  "devDependencies": {
+    "requirejs-text": "requirejs/text#~2.0.13"
+  }
 }

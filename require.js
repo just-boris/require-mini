@@ -96,6 +96,27 @@ function loadScript(name) {
         document.getElementsByTagName('body')[0].appendChild(el);
     });
 }
+
+function loadWithPlugin(dependency, path) {
+    var index = dependency.indexOf('!'),
+        plugin = dependency.substr(0, index);
+    dependency = dependency.substr(index+1);
+    return _require([plugin], function(plugin) {
+        return new Promise(function(resolve, reject) {
+            resolve.error = reject;
+            resolve.fromText = function(name, text) {
+                if(!text) {
+                    text = name;
+                }
+                var previousModule = pendingModule;
+                pendingModule = {name: name, resolve: resolve, reject: reject, path: path};
+                (new Function(text))();
+                pendingModule = previousModule;
+            };
+            plugin.load(dependency, require, resolve, config);
+        });
+    }, null, path);
+}
 function _require(deps, factory, errback, path) {
     var currentModule = path.slice(-1)[0];
     return new Promise(function(resolve, reject) {
@@ -106,6 +127,9 @@ function _require(deps, factory, errback, path) {
             var newPath = path.concat(dependency);
             if(locals[dependency]) {
                 return locals[dependency](currentModule);
+            }
+            if(dependency.indexOf('!') > -1) {
+                modules[dependency] = loadWithPlugin(dependency, newPath);
             }
             if(predefines[dependency]) {
                 modules[dependency] = Promise.resolve().then(function() {
@@ -225,3 +249,4 @@ function define(name, deps, factory) {
         predefines[name] = [deps, factory, null];
     }
 }
+define.amd = {};

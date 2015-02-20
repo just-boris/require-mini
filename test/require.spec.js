@@ -141,6 +141,21 @@ describe("module locals", function () {
     });
 });
 
+describe("plugin support", function () {
+    it("require-text", function (done) {
+        require.config({
+            paths: {
+                text: '/base/bower_components/requirejs-text/text'
+            }
+        });
+        require(['text!text-module.txt'], function(module) {
+            expect(module).toBe('text-content');
+            expect(require.specified('text!text-module.txt')).toBeTruthy();
+            done();
+        });
+    });
+});
+
 describe('error handling', function() {
     beforeEach(function () {
         spyOn(require, 'onError');
