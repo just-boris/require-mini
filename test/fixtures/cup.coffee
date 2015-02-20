@@ -1,0 +1,1 @@
+define(-> 'cup of coffee')

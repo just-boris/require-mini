@@ -154,6 +154,18 @@ describe("plugin support", function () {
             done();
         });
     });
+    it("require-cs", function (done) {
+        require.config({
+            paths: {
+                'coffee-script': '/base/bower_components/coffeescript/extras/coffee-script',
+                cs: '/base/bower_components/require-cs/cs'
+            }
+        });
+        require(['cs!cup.coffee'], function(cup) {
+            expect(cup).toBe('cup of coffee');
+            done();
+        });
+    });
 });
 
 describe('error handling', function() {

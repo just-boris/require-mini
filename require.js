@@ -103,6 +103,15 @@ function loadWithPlugin(dependency, path) {
     dependency = dependency.substr(index+1);
     return _require([plugin], function(plugin) {
         return new Promise(function(resolve, reject) {
+            function localRequire() {
+                if(!resolved) {
+                    return require.apply(null, arguments);
+                }
+            }
+            Object.keys(require).forEach(function(key) {
+                localRequire[key] = require[key];
+            });
+            var resolved = false;
             resolve.error = reject;
             resolve.fromText = function(name, text) {
                 if(!text) {
@@ -112,8 +121,9 @@ function loadWithPlugin(dependency, path) {
                 pendingModule = {name: name, resolve: resolve, reject: reject, path: path};
                 (new Function(text))();
                 pendingModule = previousModule;
+                resolved = true;
             };
-            plugin.load(dependency, require, resolve, config);
+            plugin.load(dependency, localRequire, resolve, config);
         });
     }, null, path);
 }
