@@ -64,7 +64,7 @@ describe("reqiure", function() {
             shim: {
                 'no-AMD': {
                     init: function() {
-                        return window.noAMD
+                        return window.noAMD;
                     }
                 },
                 'no-AMD-plugin': {
@@ -77,7 +77,7 @@ describe("reqiure", function() {
             expect(plugin).toBe('no-AMD plugin');
             delete window.noAmd;
             done();
-        })
+        });
     });
 });
 
@@ -87,7 +87,7 @@ describe("module locals", function () {
            return require(['B'], function(B) {return 'A'+B;});
         });
         define('B', function() {
-            return 'B'
+            return 'B';
         });
         require(['A'], function(A) {
             expect(A).toBe('AB');
@@ -123,10 +123,10 @@ describe("module locals", function () {
 
     it("should can export values through exports or module.exports", function (done) {
         define('A', ['module'], function(module) {
-            module.exports = 'whole A module'
+            module.exports = 'whole A module';
         });
         define('B', ['exports'], function(exports) {
-            exports.name = 'B'
+            exports.name = 'B';
         });
         define('C', ['module', 'exports'], function(module, exports) {
             module.exports.a = 'a';
@@ -203,7 +203,7 @@ describe('error handling', function() {
         require(['module'], function () {}, function(error) {
             expect(error.message).toBe('Module "module" should be required only by modules');
             setTimeout(done);
-        })
+        });
     });
 });
 

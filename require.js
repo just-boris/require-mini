@@ -21,7 +21,7 @@ function deepMerge(target, src) {
         if (target && typeof target === 'object') {
             Object.keys(target).forEach(function (key) {
                 dst[key] = target[key];
-            })
+            });
         }
         Object.keys(src).forEach(function (key) {
             if (typeof src[key] !== 'object' || !src[key]) {
@@ -82,9 +82,9 @@ function loadByShim(name, path) {
     var shim = config.shim[name];
     return _require(shim.deps || [], function() {
         return loadScript(name).then(shim.exportsFn || function() {
-            return (shim.init && shim.init()) || getGlobal(shim.exports)
+            return (shim.init && shim.init()) || getGlobal(shim.exports);
         });
-    }, null, path)
+    }, null, path);
 }
 function loadScript(name) {
     return new Promise(function(resolve, reject) {
@@ -119,7 +119,9 @@ function loadWithPlugin(dependency, path) {
                 }
                 var previousModule = pendingModule;
                 pendingModule = {name: name, resolve: resolve, reject: reject, path: path};
+                /* jshint -W054 */
                 (new Function(text))();
+                /* jshint +W054 */
                 pendingModule = previousModule;
                 resolved = true;
             };
@@ -174,7 +176,7 @@ var modules, predefines, config, lastTask, pendingModule,
         module: function(moduleName) {
             var module = modules[moduleName];
             if(!module) {
-                throw new Error('Module "module" should be required only by modules')
+                throw new Error('Module "module" should be required only by modules');
             }
             return (module.module = module.module || {
                 id: moduleName,
