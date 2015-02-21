@@ -4,9 +4,6 @@ beforeEach(function () {
         baseUrl: './base/test/fixtures/'
     });
 });
-afterEach(function () {
-    expect(pendingModule).toBeNull();
-});
 
 describe("reqiure", function() {
     it("should require modules", function (done) {
@@ -18,12 +15,12 @@ describe("reqiure", function() {
     });
 
     it("should not load same module twice", function (done) {
-        spyOn(window, 'loadScript').and.callThrough();
+        spyOn(require, 'load').and.callThrough();
         require(['A'], function (A1) {
             require(['A'], function(A2) {
                 expect(A1).toBe(A2);
                 expect(A2).toBe("module A");
-                expect(window.loadScript.calls.count()).toBe(1);
+                expect(require.load.calls.count()).toBe(1);
                 setTimeout(done);
             });
         });

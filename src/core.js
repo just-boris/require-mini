@@ -1,44 +1,3 @@
-/* istanbul ignore next */
-function deepMerge(target, src) {
-    var array = Array.isArray(src);
-    var dst = array && [] || {};
-
-    if (array) {
-        target = target || [];
-        dst = dst.concat(target);
-        src.forEach(function(e, i) {
-            if (typeof dst[i] === 'undefined') {
-                dst[i] = e;
-            } else if (typeof e === 'object') {
-                dst[i] = deepMerge(target[i], e);
-            } else {
-                if (target.indexOf(e) === -1) {
-                    dst.push(e);
-                }
-            }
-        });
-    } else {
-        if (target && typeof target === 'object') {
-            Object.keys(target).forEach(function (key) {
-                dst[key] = target[key];
-            });
-        }
-        Object.keys(src).forEach(function (key) {
-            if (typeof src[key] !== 'object' || !src[key]) {
-                dst[key] = src[key];
-            }
-            else {
-                if (!target[key]) {
-                    dst[key] = src[key];
-                } else {
-                    dst[key] = deepMerge(target[key], src[key]);
-                }
-            }
-        });
-    }
-    return dst;
-}
-
 function getGlobal(value) {
     return value.split('.').reduce(function (obj, prop) {
         return obj && obj[prop];
@@ -88,12 +47,9 @@ function loadByShim(name, path) {
 }
 function loadScript(name) {
     return new Promise(function(resolve, reject) {
-        var el = document.createElement("script");
+        var el = require.load(null, name, toUrl(name, true));
         el.onerror = reject;
         el.onload = resolve;
-        el.async = true;
-        el.src = toUrl(name, true);
-        document.getElementsByTagName('body')[0].appendChild(el);
     });
 }
 
@@ -204,7 +160,14 @@ require.resetContext = function() {
     pendingModule = null;
 };
 require.config = function(options) {
-    config = deepMerge(config, options);
+    config = deepmerge(config, options);
+};
+require.load = function (context, name, url) {
+    var el = document.createElement("script");
+    el.src = url;
+    el.async = true;
+    document.getElementsByTagName('body')[0].appendChild(el);
+    return el;
 };
 
 function toUrl(name, appendJS) {
