@@ -3,7 +3,7 @@ module.exports = function(config) {
     basePath: '',
     frameworks: ['jasmine'],
     files: [
-      'dest/require.js',
+      'dest/require-mini.js',
       'test/*.spec.js',
       {pattern: 'test/fixtures/**', included: false},
       {pattern: 'bower_components/**', included: false}

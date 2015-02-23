@@ -1,7 +1,7 @@
 {
-  "name": "require",
-  "version": "0.0.0",
-  "homepage": "https://github.com/just-boris/requirejs",
+  "name": "require-mini",
+  "version": "0.0.1",
+  "homepage": "https://github.com/just-boris/require-mini",
   "authors": [
     "just-boris <just-boris@hotmail.com>"
   ],

@@ -22,7 +22,7 @@ gulp.task('lint', function() {
 });
 
 gulp.task('build', function() {
-    return gulp.src('src/require.js')
+    return gulp.src('src/require-mini.js')
         .pipe(include())
         .pipe(gulp.dest(buildTarget))
         .pipe(sourcemaps.init())
