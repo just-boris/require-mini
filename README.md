@@ -4,7 +4,7 @@
 
 ## Overview
 
-It's library with [require.js](https://github.com/jrburke/requirejs/) compatible API and full-plugin support.
+It's library with [require.js](https://github.com/jrburke/requirejs/) compatible API and full support of plugins.
 Some of features we don't support for now, but most of functions works properly. Look at examples in our [tests](test).
 
 In the most cases you can just switch from original `require.js` to our `require-mini` without any code modifications.
