@@ -5,12 +5,13 @@
 ## Overview
 
 It's library with [require.js](https://github.com/jrburke/requirejs/) compatible API and full support of plugins.
-Some of features we don't support for now, but most of functions works properly. Look at examples in our [tests](test).
+We are focusing on small size and use promises which are [native in most browsers](http://caniuse.com/#feat=promises). 
+Some of features we don't support for now, but most part of functions works properly. Look at examples in our [tests](test).
 
-In the most cases you can just switch from original `require.js` to our `require-mini` without any code modifications.
+Generally you can just switch from original `require.js` to our `require-mini` without any code modifications and will get advantage of lesser code which takes time to load.
 [Documentation](http://requirejs.org/docs/api.html) from require.js also applicable here.
 
-Because we are using promises, you will get support of asynchronus defines wihout any plugins
+Additionaly, because we are using promises, you will get support of asynchronus defines wihout any plugins
 
 ```js
 define('userData', ['fetch'], function(fetch) {
