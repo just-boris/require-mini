@@ -8,8 +8,7 @@ beforeEach(function () {
 describe("reqiure", function() {
     it("should require modules", function (done) {
         require(['A', 'B'], function (A, B) {
-            expect(A).toBe("module A");
-            expect(B).toBe("module B");
+            expect([A, B]).toHaveSameItems(["module A", "module B"]);
             setTimeout(done);
         });
     });
@@ -18,8 +17,7 @@ describe("reqiure", function() {
         spyOn(require, 'load').and.callThrough();
         require(['A'], function (A1) {
             require(['A'], function(A2) {
-                expect(A1).toBe(A2);
-                expect(A2).toBe("module A");
+                expect([A1, A2]).toHaveSameItems(["module A", "module A"]);
                 expect(require.load.calls.count()).toBe(1);
                 setTimeout(done);
             });

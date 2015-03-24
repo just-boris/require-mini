@@ -3,6 +3,7 @@ module.exports = function(config) {
     basePath: '',
     frameworks: ['jasmine'],
     files: [
+      'node_modules/jasmine-collection-matchers/lib/pack.js',
       'dest/require-mini.js',
       'test/*.spec.js',
       {pattern: 'test/fixtures/**', included: false},
