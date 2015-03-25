@@ -54,6 +54,17 @@ describe("reqiure", function() {
         });
     });
 
+    it("load static modules", function(done) {
+        var factoryA = jasmine.createSpy('factoryA');
+        define('A', factoryA);
+        define('B', ['A'], 'module B');
+        require(['B'], function(B) {
+            expect(B).toBe('module B');
+            expect(factoryA).toHaveBeenCalled();
+            done();
+        });
+    });
+
     it("loading by shim", function (done) {
         require.config({
             shim: {

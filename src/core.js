@@ -1,7 +1,11 @@
-function getGlobal(value) {
+function safeGet(global, value) {
     return value.split('.').reduce(function (obj, prop) {
         return obj && obj[prop];
-    }, window);
+    }, global);
+}
+
+function isFunction(fn) {
+    return typeof fn === 'function';
 }
 
 function defer() {
@@ -41,7 +45,7 @@ function loadByShim(name, path) {
     var shim = config.shim[name];
     return _require(shim.deps || [], function() {
         return loadScript(name).then(shim.exportsFn || function() {
-            return (shim.init && shim.init()) || getGlobal(shim.exports);
+            return (shim.init && shim.init()) || safeGet(window, shim.exports);
         });
     }, null, path);
 }
@@ -143,10 +147,14 @@ function _require(deps, factory, errback, path) {
             return modules[dependency];
         })).then(resolve, reject);
     }).then(function (instances) {
-        var result = factory.apply(null, instances);
-        return currentModule && modules[currentModule].module && modules[currentModule].module.exports || result;
+        if(isFunction(factory)) {
+            var result = factory.apply(null, instances);
+            return currentModule && safeGet(modules[currentModule], 'module.exports') || result;
+        } else {
+            return factory;
+        }
     }, function(reason) {
-        if(typeof errback === 'function') {
+        if(isFunction(errback)) {
             errback(reason);
         }
         require.onError(reason);
