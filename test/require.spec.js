@@ -134,6 +134,28 @@ describe("module locals", function () {
             done();
         });
     });
+
+    it("CommonJS support", function(done) {
+        require.config({
+            config: {
+                'A-cjs': 'A',
+                'B-cjs': 'B'
+            }
+        });
+        define('A-cjs', function(require, module, exports) {
+            exports.a = module.config();
+            exports.b = require('B-cjs');
+        });
+
+        define('B-cjs', function(require, module) {
+            module.exports = module.config();
+        });
+
+        require(['A-cjs'], function(A) {
+            expect(A).toEqual({a: 'A', b: 'B'});
+            done();
+        });
+    });
 });
 
 describe("plugin support", function () {

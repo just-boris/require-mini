@@ -85,6 +85,39 @@ function loadWithPlugin(dependency, path) {
         });
     }, null, path);
 }
+
+var commentRegExp = /(\/\*([\s\S]*?)\*\/|([^:]|^)\/\/(.*)$)/mg,
+    cjsRequireRegExp = /[^.]\s*require\s*\(\s*["']([^'"\s]+)["']\s*\)/g;
+function wrapCommonJS(name, factory) {
+    var deps = [];
+    factory.toString()
+        .replace(commentRegExp, '')
+        .replace(cjsRequireRegExp, function (match, dep) {
+            deps.push(dep);
+        });
+    return {
+        deps: deps,
+        factory: function() {
+            var args = arguments,
+                modules = deps.reduce(function(modules, name, index) {
+                modules[name] = args[index];
+                return modules;
+            }, {});
+            return factory(
+                function localRequire(name) {
+                    if(!modules[name]) {
+                        throw new Error('Module "' + deps + '" has not been loaded yet');
+                    }
+                    return modules[name];
+                },
+                locals.module(name),
+                locals.exports(name)
+            );
+        }
+    };
+}
+
+
 function _require(deps, factory, errback, path) {
     var currentModule = path.slice(-1)[0];
     return new Promise(function(resolve, reject) {
@@ -217,7 +250,15 @@ function define(name, deps, factory) {
     var deferred = pendingModule;
     if(name === null && !deferred) {
         throw new Error('Unexpected define!');
-    } else if (name === null || deferred && deferred.name === name) {
+    }
+
+    if(deps.length === 0 && factory.length > 0) {
+        var wrapped = wrapCommonJS(name || deferred.name, factory);
+        deps = wrapped.deps;
+        factory = wrapped.factory;
+    }
+
+    if (name === null || deferred && deferred.name === name) {
         var module = _require(deps, factory, deferred.reject, deferred.path);
         deferred.resolve(module);
     } else {
